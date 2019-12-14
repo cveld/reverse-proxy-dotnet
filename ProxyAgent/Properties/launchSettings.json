@@ -2,6 +2,10 @@
   "iisSettings": {
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
+    "iis": {
+      "applicationUrl": "http://reverseproxy.local",
+      "sslPort": 0
+    },
     "iisExpress": {
       "applicationUrl": "http://localhost:10080/",
       "sslPort": 0
@@ -28,6 +32,13 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "http://localhost:10080"
+    },
+    "Azure Dev Spaces": {
+      "commandName": "AzureDevSpaces",
+      "launchBrowser": true
+    },
+    "IIS": {
+      "commandName": "IIS"
     }
   }
 }

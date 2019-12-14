@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Exceptions;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.Models;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
 using Microsoft.Extensions.Primitives;
 using HttpRequest = Microsoft.AspNetCore.Http.HttpRequest;
@@ -20,8 +21,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
     {
         Task<ProxyStatus> PingAsync();
 
-        Task ProcessAsync(
-            string remoteEndpoint,
+        Task ProcessAsync(            
             HttpRequest requestIn,
             HttpResponse responseOut);
     }
@@ -55,7 +55,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 "x-powered-by",
                 HSTS_HEADER.ToLowerInvariant()
             };
-
+        private readonly FeaturesManager featuresManager;
         private readonly IHttpClient client;
 
         private readonly IConfig config;
@@ -63,10 +63,12 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         private readonly ILogger log;
 
         public Proxy(
+            FeaturesManager featuresManager,
             IHttpClient httpclient,
             IConfig config,
             ILogger log)
         {
+            this.featuresManager = featuresManager;
             this.client = httpclient;
             this.config = config;
             this.log = log;
@@ -75,7 +77,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         public async Task<ProxyStatus> PingAsync()
         {
             var request = new HttpClient.HttpRequest();
-            request.SetUriFromString(this.config.Endpoint);
+            //request.SetUriFromString(this.config.Endpoint);
             request.Options.EnsureSuccess = false;
             request.Options.Timeout = 5000;
 
@@ -98,8 +100,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             };
         }
 
-        public async Task ProcessAsync(
-            string remoteEndpoint,
+        public async Task ProcessAsync(            
             HttpRequest requestIn,
             HttpResponse responseOut)
         {
@@ -108,7 +109,13 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             try
             {
                 this.RedirectToHttpsIfNeeded(requestIn);
-                request = this.BuildRequest(requestIn, remoteEndpoint);
+                request = this.BuildRequest(requestIn);
+                if (request == null)
+                {
+                    // requested app cannot be found in configuration, return 404:
+                    responseOut.StatusCode = 404;
+                    return;
+                }
             }
             catch (RequestPayloadTooLargeException)
             {
@@ -170,7 +177,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         }
 
         // Prepare the request to send to the remote endpoint
-        private IHttpRequest BuildRequest(HttpRequest requestIn, string toHostname)
+        private IHttpRequest BuildRequest(HttpRequest requestIn)
         {
             var requestOut = new HttpClient.HttpRequest();
 
@@ -190,7 +197,23 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 }
             }
 
-            var url = toHostname + requestIn.Path.Value + requestIn.QueryString;
+            string feature;
+            if (!requestIn.Cookies.TryGetValue("feature", out feature))
+            {
+                // cookie not set. return 404
+                return null;
+            }
+            var activefeature = featuresManager.Features[feature];
+            
+            var segments = requestIn.Path.Value.Split('/');
+            if (!activefeature.ContainsKey(segments[1]))
+            {
+                // requested app not found in feature configuration. return 404
+                return null;
+            }
+            var toHostname = activefeature[segments[1]];
+            var path = string.Join("/", segments.Skip(2));
+            var url = toHostname + "/" + path + requestIn.QueryString;
             this.log.Debug("URL", () => new { url });
             requestOut.SetUriFromString(url);
 

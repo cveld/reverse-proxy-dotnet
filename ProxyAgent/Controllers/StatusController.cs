@@ -39,7 +39,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Controllers
                     { "ProcessId", Uptime.ProcessId },
                     { "Uptime.Start", Uptime.Start.ToString() },
                     { "Uptime.Duration", Uptime.Duration.ToString(@"dd\.hh\:mm\:ss") },
-                    { "Endpoint", this.config.Endpoint },
+                    
                     { "MaxPayloadSize", this.config.MaxPayloadSize.ToString() },
                     { "RedirectHttpToHttps", this.config.RedirectHttpToHttps.ToString() },
                     { "StrictTransportSecurityEnabled", this.config.StrictTransportSecurityEnabled.ToString() },

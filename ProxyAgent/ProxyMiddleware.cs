@@ -11,8 +11,7 @@ using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy
 {
     public class ProxyMiddleware
-    {
-        private readonly string endpoint;
+    {        
         private readonly IProxy proxy;
         private readonly ILogger log;
 
@@ -25,14 +24,14 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         {
             this.proxy = proxy;
             this.log = log;
-            this.endpoint = config.Endpoint;
+            
         }
 
         public async Task Invoke(HttpContext context)
         {
             try
             {
-                await this.proxy.ProcessAsync(this.endpoint, context.Request, context.Response);
+                await this.proxy.ProcessAsync(context.Request, context.Response);
                 this.log.Debug("--------------------------------------------------------------------------------", () => { });
             }
             catch (Exception e)
