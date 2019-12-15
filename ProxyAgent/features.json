@@ -1,5 +1,6 @@
 ﻿{
   "default": {
+    "default": "http://mijnww.local",
     "mijnww": "http://mijnww.local/version1"
   },
   "feature1": {

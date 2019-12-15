@@ -9,8 +9,26 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Models
 {
     public class FeaturesManager
     {
-        const string DEFAULTFEATURE = "default";
-        const string PARENTKEY = "parent";
+        /// <summary>
+        /// Defines the key to the default or root feature
+        /// </summary>
+        public const string DEFAULTFEATURE = "default";
+        /// <summary>
+        /// Defines the key within a feature to the default url if no app matches
+        /// </summary>
+        public const string DEFAULTURLKEY = "default";
+        /// <summary>
+        /// Defines the key within a feature that defines the parent feature
+        /// </summary>
+        public const string PARENTKEY = "parent";
+        /// <summary>
+        /// Defines the http header that contains the active feature
+        /// </summary>
+        public const string HTTPHEADER_FEATURE = "feature";
+        /// <summary>
+        /// Defines the cookie that contains the active feature
+        /// </summary>
+        public const string COOKIE_FEATURE = "feature";
         public Dictionary<string, Dictionary<string, string>> Features = new Dictionary<string, Dictionary<string, string>>();
         public FeaturesManager()
         {

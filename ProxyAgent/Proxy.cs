@@ -198,22 +198,36 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             }
 
             string feature;
-            if (!requestIn.Cookies.TryGetValue("feature", out feature))
+            if (!requestIn.Cookies.TryGetValue(FeaturesManager.COOKIE_FEATURE, out feature))
             {
-                // cookie not set. return 404
-                return null;
+                // if cookie is not present, then check httpheader:
+                var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);
+                if (result)
+                {
+                    feature = stringValues[0];
+                }
+                else
+                {
+                    // Neither cookie nor httpheader are set. Set default feature:
+                    feature = FeaturesManager.DEFAULTFEATURE;
+                }
             }
             var activefeature = featuresManager.Features[feature];
             
             var segments = requestIn.Path.Value.Split('/');
+            string url;
             if (!activefeature.ContainsKey(segments[1]))
             {
-                // requested app not found in feature configuration. return 404
-                return null;
+                // requested app not found in feature configuration, forward request to the default:
+                var toHostname = activefeature[FeaturesManager.DEFAULTURLKEY];
+                url = toHostname + "/" + requestIn.Path.Value + requestIn.QueryString;
             }
-            var toHostname = activefeature[segments[1]];
-            var path = string.Join("/", segments.Skip(2));
-            var url = toHostname + "/" + path + requestIn.QueryString;
+            else
+            {
+                var toHostname = activefeature[segments[1]];
+                var path = string.Join("/", segments.Skip(2));
+                url = toHostname + "/" + path + requestIn.QueryString;
+            }
             this.log.Debug("URL", () => new { url });
             requestOut.SetUriFromString(url);
 

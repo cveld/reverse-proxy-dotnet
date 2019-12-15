@@ -1,0 +1,2 @@
+curl -H "feature: feature1" http://reverseproxy.local/mijnww
+curl -C "feature=feature1" http://reverseproxy.local/mijnww
