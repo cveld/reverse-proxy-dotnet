@@ -17,6 +17,7 @@ namespace PassthroughFeatureHttpHeader
     public class PassthroughFeatureHttpHeaderEndpointBehavior : BehaviorExtensionElement, IEndpointBehavior, IClientMessageInspector
     {
         const string FEATURE_HEADER = "feature";
+        const string FEATURE_COOKIE = "feature";        
 
         public override Type BehaviorType => typeof(PassthroughFeatureHttpHeaderEndpointBehavior);
 
@@ -47,12 +48,25 @@ namespace PassthroughFeatureHttpHeader
             HttpRequestMessageProperty httpRequestMessage;
 
             object httpRequestMessageObject;
-            var feature = HttpContext.Current.Request.Headers[FEATURE_HEADER];
+            string feature;
+            feature = HttpContext.Current.Request.Cookies[FEATURE_COOKIE].Value;
+            if (feature == null)
+            {
+                // if cookie is not present, check http headers:
+                feature = HttpContext.Current.Request.Headers[FEATURE_HEADER];
+            }
+            if (feature == null)
+            {
+                // if neither cookie is present, nor http header, then do nothing:
+                return null;
+            }
+
 
             if (request.Properties.TryGetValue(HttpRequestMessageProperty.Name, out httpRequestMessageObject))
 
             {
                 httpRequestMessage = httpRequestMessageObject as HttpRequestMessageProperty;
+                
 
                 if (string.IsNullOrEmpty(httpRequestMessage.Headers[FEATURE_HEADER]))
                 {                    
