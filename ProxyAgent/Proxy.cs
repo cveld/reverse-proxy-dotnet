@@ -195,23 +195,28 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 {
                     requestOut.AddHeader(header.Key, value);
                 }
-            }
+            }                      
 
+            // Check http header for feature configuration:
+            var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);
             string feature;
-            if (!requestIn.Cookies.TryGetValue(FeaturesManager.COOKIE_FEATURE, out feature))
+
+            if (result)
             {
-                // if cookie is not present, then check httpheader:
-                var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);
-                if (result)
-                {
-                    feature = stringValues[0];
-                }
-                else
+                feature = stringValues[0];
+            }
+            else
+            {
+                // if http header not present, check cookie:
+                if (!requestIn.Cookies.TryGetValue(FeaturesManager.COOKIE_FEATURE, out feature))
                 {
                     // Neither cookie nor httpheader are set. Set default feature:
                     feature = FeaturesManager.DEFAULTFEATURE;
                 }
+                // feature configuration not yet available in http header. Add it:
+                requestOut.AddHeader(FeaturesManager.HTTPHEADER_FEATURE, feature);
             }
+                                       
             var activefeature = featuresManager.Features[feature];
             
             var segments = requestIn.Path.Value.Split('/');

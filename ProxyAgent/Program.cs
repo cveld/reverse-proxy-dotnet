@@ -14,7 +14,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 {
                     options.AddServerHeader = false;
                 })
-                .UseLibuv(options => options.ThreadCount = System.Environment.ProcessorCount)
+                //.UseLibuv(options => options.ThreadCount = System.Environment.ProcessorCount)
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .UseIISIntegration()
                 .UseStartup<Startup>()

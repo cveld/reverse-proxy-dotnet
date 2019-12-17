@@ -1,10 +1,10 @@
 ﻿{
   "default": {
-    "default": "http://mijnww.local",
-    "mijnww": "http://mijnww.local/version1"
+    "default": "http://mijnuwv.local",
+    "mijnww": "http://mijnuwv.local/version1"
   },
   "feature1": {
     "parent": "default",
-    "mijnww": "http://mijnww.local/version2"
+    "mijnww": "http://mijnuwv.local/version2"
   }
 }

@@ -33,12 +33,12 @@
       },
       "applicationUrl": "http://localhost:10080"
     },
-    "Azure Dev Spaces": {
-      "commandName": "AzureDevSpaces",
-      "launchBrowser": true
-    },
     "IIS": {
-      "commandName": "IIS"
+      "commandName": "IIS",
+      "environmentVariables": {
+        "REMOTE_ENDPOINT": "Value",
+        "Key": "Value"
+      }
     }
   }
 }

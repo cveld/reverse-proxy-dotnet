@@ -12,7 +12,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
     {
         Uri Uri { get; set; }
 
-        HttpHeaders Headers { get; }
+        HttpHeaders Headers { get; }        
 
         MediaTypeHeaderValue ContentType { get; }
 
@@ -65,7 +65,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
         public HttpRequestOptions Options { get; } = new HttpRequestOptions();
 
         public HttpContent Content => this.requestContent.Content;
-
+        
         public HttpRequest()
         {
             this.Headers = new HttpHeaders();
@@ -166,7 +166,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
             }
             else if (!mediaType.StartsWith(MULTIPART_REQUEST_CONTENT_TYPE_PREFIX, StringComparison.InvariantCultureIgnoreCase))
             {
-                this.ContentType = new MediaTypeHeaderValue(mediaType);
+                this.ContentType = MediaTypeHeaderValue.Parse(mediaType);
             }
 
             return this;
