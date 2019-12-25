@@ -57,10 +57,14 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             };
         private readonly FeaturesManager featuresManager;
         private readonly IHttpClient client;
-
         private readonly IConfig config;
-
         private readonly ILogger log;
+
+        private string fromSchemeHostname;
+        private string fromUrl;
+        private string toSchemeHostname;
+        private string toUrl;
+        private string feature;
 
         public Proxy(
             FeaturesManager featuresManager,
@@ -165,7 +169,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                     return;
             }
 
-            await this.BuildResponseAsync(response, responseOut, requestIn);
+            await this.BuildResponseAsync(response, responseOut, request, requestIn);
         }
 
         private void RedirectToHttpsIfNeeded(HttpRequest requestIn)
@@ -198,8 +202,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             }                      
 
             // Check http header for feature configuration:
-            var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);
-            string feature;
+            var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);            
 
             if (result)
             {
@@ -224,15 +227,20 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             if (!activefeature.ContainsKey(segments[1]))
             {
                 // requested app not found in feature configuration, forward request to the default:
-                var toHostname = activefeature[FeaturesManager.DEFAULTURLKEY];
-                url = toHostname + "/" + requestIn.Path.Value + requestIn.QueryString;
+                toUrl = activefeature[FeaturesManager.DEFAULTURLKEY];
+                url = toUrl + "/" + requestIn.Path.Value + requestIn.QueryString;
+                fromUrl = requestIn.Scheme + "://" + requestIn.Host;
+                fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
             }
             else
             {
-                var toHostname = activefeature[segments[1]];
+                toUrl = activefeature[segments[1]];
                 var path = string.Join("/", segments.Skip(2));
-                url = toHostname + "/" + path + requestIn.QueryString;
+                url = toUrl + "/" + path + requestIn.QueryString;
+                fromUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + segments[1];
+                fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
             }
+
             this.log.Debug("URL", () => new { url });
             requestOut.SetUriFromString(url);
 
@@ -252,7 +260,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             return requestOut;
         }
 
-        private async Task BuildResponseAsync(IHttpResponse response, HttpResponse responseOut, HttpRequest requestIn)
+        private async Task BuildResponseAsync(IHttpResponse response, HttpResponse responseOut, IHttpRequest request, HttpRequest requestIn)
         {
             // Forward the HTTP status code
             this.log.Debug("Status code", () => new { response.StatusCode });
@@ -268,11 +276,20 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                     {
                         this.log.Debug("Ignoring response header", () => new { header.Key, header.Value });
                         continue;
-                    }
+                    }                    
 
                     this.log.Debug("Adding response header", () => new { header.Key, header.Value });
-                    foreach (var value in header.Value)
+                    foreach (var incomingvalue in header.Value)
                     {
+                        var value = incomingvalue;
+                        if (header.Key == "Location")
+                        {
+                            // rewrite redirect url
+                            var fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
+                            var toSchemeHostname = request.Uri.Scheme + "://" + request.Uri.Host;
+                            value = value.Replace(toSchemeHostname, fromSchemeHostname);
+                        }
+
                         if (!responseOut.Headers.ContainsKey(header.Key))
                         {
                             responseOut.Headers[header.Key] = value;
@@ -305,7 +322,34 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             // Some status codes like 204 and 304 can't have a body
             if (response.CanHaveBody && response.Content.Length > 0)
             {
-                await responseOut.Body.WriteAsync(response.Content, 0, response.Content.Length);
+                var rewritepayload = RewritePayload(requestIn, request, response);
+                responseOut.Headers["Content-Length"] = rewritepayload.Length.ToString();
+                await responseOut.Body.WriteAsync(rewritepayload, 0, rewritepayload.Length);
+            }
+        }
+
+        byte[] RewritePayload(HttpRequest requestIn, IHttpRequest request, IHttpResponse response)
+        {
+            var content = response.Content;
+            var contenttypekv = response.Headers.Where(h => h.Key.ToLower() == "content-type").FirstOrDefault();
+            var contenttype = contenttypekv.Value.FirstOrDefault();
+            if (contenttype?.Contains(";") == true)
+            {
+                contenttype = contenttype.Substring(0, contenttype.IndexOf(";"));
+            }
+            contenttype = contenttype?.ToLower();
+
+            if (contenttype == "text/html" || contenttype == "text/javascript" || contenttype == "application/json")            
+            {
+                var stringContent = Encoding.UTF8.GetString(content);
+                var fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
+                var toSchemeHostname = request.Uri.Scheme + "://" + request.Uri.Host;
+                var newContent = stringContent.Replace(toSchemeHostname, fromSchemeHostname);
+                return Encoding.UTF8.GetBytes(newContent);
+            }
+            else
+            {
+                return content;
             }
         }
 

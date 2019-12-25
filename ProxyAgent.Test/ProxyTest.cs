@@ -6,6 +6,7 @@ using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.IoTSolutions.ReverseProxy;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.Models;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
 using Moq;
 using ProxyAgent.Test.helpers;
@@ -22,13 +23,15 @@ namespace ProxyAgent.Test
 
         private readonly Mock<IHttpClient> client;
         private readonly Mock<IConfig> config;
+        private readonly Mock<FeaturesManager> featureManager;
         private readonly Proxy target;
 
         public ProxyTest(ITestOutputHelper log)
         {
             this.client = new Mock<IHttpClient>();
             this.config = new Mock<IConfig>();
-            this.target = new Proxy(this.client.Object, this.config.Object, new TargetLogger(log));
+            this.featureManager = new Mock<FeaturesManager>();
+            this.target = new Proxy(this.featureManager.Object, this.client.Object, this.config.Object, new TargetLogger(log));
         }
 
         /**
@@ -39,7 +42,7 @@ namespace ProxyAgent.Test
         {
             // Arrange - Configuration
             var remoteEndpoint = "https://" + Guid.NewGuid() + "/";
-            this.config.SetupGet(x => x.Endpoint).Returns(remoteEndpoint);
+            // this.config.SetupGet(x => x.Endpoint).Returns(remoteEndpoint);
             // Arrange - Remote endpoint response
             var endpointResponse = new Mock<IHttpResponse>();
             this.client
@@ -72,7 +75,7 @@ namespace ProxyAgent.Test
             var (request, response) = PrepareContext(port: 80, path: "/foo", query: "?bar");
 
             // Act
-            this.target.ProcessAsync("http://" + request.Host, request, response).Wait(TestTimeout);
+            this.target.ProcessAsync(request, response).Wait(TestTimeout);
 
             // Assert - No request is made to the remote endpoint
             this.client.Verify(x => x.GetAsync(It.IsAny<IHttpRequest>()), Times.Never);
@@ -128,7 +131,7 @@ namespace ProxyAgent.Test
             clientResponse.SetupGet(x => x.Headers).Returns(clientResponseHeaders);
 
             // Act
-            this.target.ProcessAsync("https://" + request.Host, request, response).Wait(TestTimeout);
+            this.target.ProcessAsync(request, response).Wait(TestTimeout);
 
             // Assert - these request headers are allowed
             this.client.Verify(x => x.GetAsync(It.Is<IHttpRequest>(r => r.Headers.Contains("Content-Type"))), Times.Once);
@@ -183,7 +186,7 @@ namespace ProxyAgent.Test
             this.client.Setup(x => x.GetAsync(It.IsAny<IHttpRequest>())).ReturnsAsync(clientResponse.Object);
 
             // Act
-            this.target.ProcessAsync("https://" + request.Host, request, response).Wait(TestTimeout);
+            this.target.ProcessAsync(request, response).Wait(TestTimeout);
 
             // Assert - the request ran, without exceptions
             this.client.Verify(x => x.GetAsync(It.IsAny<IHttpRequest>()), Times.Once);
@@ -207,7 +210,7 @@ namespace ProxyAgent.Test
             this.client.Setup(x => x.GetAsync(It.IsAny<IHttpRequest>())).ReturnsAsync(clientResponse.Object);
 
             // Act
-            this.target.ProcessAsync("https://" + request.Host, request, response).Wait(TestTimeout);
+            this.target.ProcessAsync(request, response).Wait(TestTimeout);
 
             // Assert - the status code matches
             Assert.Equal((int) statusCode, response.StatusCode);
