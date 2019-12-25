@@ -331,8 +331,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         byte[] RewritePayload(HttpRequest requestIn, IHttpRequest request, IHttpResponse response)
         {
             var content = response.Content;
-            var contenttypekv = response.Headers.Where(h => h.Key.ToLower() == "content-type").FirstOrDefault();
-            var contenttype = contenttypekv.Value.FirstOrDefault();
+            var contenttypekv = response.Headers?.Where(h => h.Key.ToLower() == "content-type").FirstOrDefault();
+            var contenttype = contenttypekv?.Value.FirstOrDefault();
             if (contenttype?.Contains(";") == true)
             {
                 contenttype = contenttype.Substring(0, contenttype.IndexOf(";"));
