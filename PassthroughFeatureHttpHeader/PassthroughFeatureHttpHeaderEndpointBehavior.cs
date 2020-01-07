@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
@@ -7,6 +8,7 @@ using System.ServiceModel.Description;
 using System.ServiceModel.Dispatcher;
 using System.Web;
 
+// This implementation is heavily inspired by the following blog post:
 // https://blogs.msmvps.com/paulomorgado/2007/04/26/wcf-building-an-http-user-agent-message-inspector/
 
 namespace PassthroughFeatureHttpHeader
@@ -35,7 +37,10 @@ namespace PassthroughFeatureHttpHeader
         {
             var inspector = this;
             // HttpUserAgentMessageInspector inspector = new HttpUserAgentMessageInspector(this.m_userAgent);
-            clientRuntime.MessageInspectors.Add(inspector);
+            if (Enabled)
+            {
+                clientRuntime.MessageInspectors.Add(inspector);
+            }
         }
 
         public void ApplyDispatchBehavior(ServiceEndpoint endpoint, EndpointDispatcher endpointDispatcher)
@@ -92,6 +97,18 @@ namespace PassthroughFeatureHttpHeader
         {
             return this;
             // return new HttpUserAgentEndpointBehavior(UserAgent);
+        }
+
+        [ConfigurationProperty("enabled", IsRequired = false)]
+
+        public bool Enabled
+
+        {
+
+            get { return (bool)base["enabled"]; }
+
+            set { base["enabled"] = value; }
+
         }
     }
 }
