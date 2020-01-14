@@ -17,9 +17,15 @@ namespace PassthroughFeatureHttpHeader
     public class PassthroughFeatureHttpHeaderEndpointBehavior : BehaviorExtensionElement, IEndpointBehavior, IClientMessageInspector
     {
         const string FEATURE_HEADER = "feature";
-        const string FEATURE_COOKIE = "feature";        
+        const string FEATURE_COOKIE = "feature";
 
-        public override Type BehaviorType => typeof(PassthroughFeatureHttpHeaderEndpointBehavior);
+        public override Type BehaviorType
+        {
+            get
+            {
+                return typeof(PassthroughFeatureHttpHeaderEndpointBehavior);
+            }
+        }
 
         public void AddBindingParameters(ServiceEndpoint endpoint, BindingParameterCollection bindingParameters)
         {
@@ -49,7 +55,7 @@ namespace PassthroughFeatureHttpHeader
 
             object httpRequestMessageObject;
             string feature;
-            feature = HttpContext.Current.Request.Cookies[FEATURE_COOKIE].Value;
+            feature = HttpContext.Current.Request.Cookies[FEATURE_COOKIE]?.Value;
             if (feature == null)
             {
                 // if cookie is not present, check http headers:

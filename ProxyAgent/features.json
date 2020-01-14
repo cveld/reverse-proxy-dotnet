@@ -1,13 +1,12 @@
 ﻿{
   "default": {
     "default": "http://mijnuwv.local",
-    "mijnww": "http://mijnuwv.local/version1",
     "uitvoeren-taken": "http://local.portaalwn-netcore.uwv.nl/uitvoeren-taken",
     "kias": "http://local.portaalwn-netcore.uwv.nl/kias",
-    "webapi": "http://local.portaalwn-netcore.uwv.nl/webapi"
+    "webapi": "http://local.portaalwn-netcore.uwv.nl/webapi",
   },
   "feature1": {
     "parent": "default",
-    "mijnww": "http://mijnuwv.local/version2"
+    "okl-kps": "http://stubs.local/okl-kps2"
   }
 }
