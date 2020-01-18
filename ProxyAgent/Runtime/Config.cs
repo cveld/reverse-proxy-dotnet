@@ -13,7 +13,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
     public interface IConfig
     {
         // The remote endpoint the proxy communicates with
-        string Endpoint { get; }
+        // string Endpoint { get; }
 
         // The remote endpoint ssl certificate thumbprint the proxy communicates with
         string SslCertThumbprint { get; }
@@ -59,8 +59,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
         private const string MAX_PAYLOAD_SIZE_KEY = APPLICATION_KEY + "maxPayloadSize";
         private const string STATUS_ENDPOINT_ENABLED_KEY = APPLICATION_KEY + "statusEndpointEnabled";
         private const string LOG_LEVEL_KEY = APPLICATION_KEY + "loglevel";
-
-        public string Endpoint { get; }
+        
         public string SslCertThumbprint { get; }
         public bool RedirectHttpToHttps { get; }
         public bool StrictTransportSecurityEnabled { get; }
@@ -81,12 +80,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
             this.StrictTransportSecurityEnabled = configData.GetBool(STS_ENABLED_KEY, STS_ENABLED_DEFAULT);
             this.StrictTransportSecurityPeriod = configData.GetInt(STS_PERIOD_KEY, STS_PERIOD_DEFAULT);
 
-            this.Endpoint = configData.GetString(ENDPOINT_KEY);
-            this.SslCertThumbprint = configData.GetString(SSL_CERT_THUMBPRINT_KEY);
-            if (string.IsNullOrEmpty(this.Endpoint))
-            {
-                throw new InvalidConfigurationException("The remote endpoint hostname is empty.");
-            }
+            
+            this.SslCertThumbprint = configData.GetString(SSL_CERT_THUMBPRINT_KEY);            
         }
     }
 }

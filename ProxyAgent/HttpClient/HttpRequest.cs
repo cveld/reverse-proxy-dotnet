@@ -4,15 +4,17 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
 using Newtonsoft.Json;
+using HttpHeaders = Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpHeaders;
 
-namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
+namespace ReverseProxy.HttpClient
 {
     public interface IHttpRequest
     {
         Uri Uri { get; set; }
 
-        HttpHeaders Headers { get; }
+        Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpHeaders Headers { get; }        
 
         MediaTypeHeaderValue ContentType { get; }
 
@@ -65,7 +67,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
         public HttpRequestOptions Options { get; } = new HttpRequestOptions();
 
         public HttpContent Content => this.requestContent.Content;
-
+        
         public HttpRequest()
         {
             this.Headers = new HttpHeaders();
@@ -166,7 +168,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
             }
             else if (!mediaType.StartsWith(MULTIPART_REQUEST_CONTENT_TYPE_PREFIX, StringComparison.InvariantCultureIgnoreCase))
             {
-                this.ContentType = new MediaTypeHeaderValue(mediaType);
+                this.ContentType = MediaTypeHeaderValue.Parse(mediaType);
             }
 
             return this;

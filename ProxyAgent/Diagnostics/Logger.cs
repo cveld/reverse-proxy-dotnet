@@ -14,7 +14,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics
         Error = 40
     }
 
-    public interface ILogger
+    public interface ILogger2
     {
         // The following 4 methods allow to log a message, capturing the context
         // (i.e. the method where the log message is generated)
@@ -33,12 +33,12 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics
         void Error(string message, Func<object> context);
     }
 
-    public class Logger : ILogger
+    public class Logger2 : ILogger2
     {
         private readonly string processId;
         private readonly LogLevel loggingLevel;
 
-        public Logger(string processId, LogLevel loggingLevel)
+        public Logger2(string processId, LogLevel loggingLevel)
         {
             this.processId = processId;
             this.loggingLevel = loggingLevel;

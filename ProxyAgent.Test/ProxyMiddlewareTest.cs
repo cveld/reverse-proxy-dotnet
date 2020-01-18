@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.IoTSolutions.ReverseProxy;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
+using Microsoft.Extensions.Logging;
 using Moq;
+using ReverseProxy;
 using Xunit;
 
 namespace ProxyAgent.Test
@@ -19,10 +21,10 @@ namespace ProxyAgent.Test
             // Arrange
             var next = new Mock<RequestDelegate>();
             var proxy = new Mock<IProxy>();
-            var log = new Mock<ILogger>();
+            var log = new Mock<ILogger<ProxyMiddleware>>();
 
             var config = new Mock<IConfig>();
-            config.SetupGet(x => x.Endpoint).Returns(ENDPOINT);
+            // config.SetupGet(x => x.Endpoint).Returns(ENDPOINT);
 
             var request = new Mock<HttpRequest>();
             var response = new Mock<HttpResponse>();
@@ -36,7 +38,7 @@ namespace ProxyAgent.Test
             target.Invoke(context.Object).Wait();
 
             // Assert
-            proxy.Verify(x => x.ProcessAsync(ENDPOINT, request.Object, response.Object), Times.Once);
+            proxy.Verify(x => x.ProcessAsync(request.Object, response.Object), Times.Once);
         }
     }
 }

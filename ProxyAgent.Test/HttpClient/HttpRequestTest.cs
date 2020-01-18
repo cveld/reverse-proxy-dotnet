@@ -2,6 +2,7 @@
 
 using System.Text;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
+using ReverseProxy.HttpClient;
 using Xunit;
 
 namespace ProxyAgent.Test.HttpClient

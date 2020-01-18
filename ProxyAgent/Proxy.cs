@@ -1,31 +1,39 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Azure.IoTSolutions.ReverseProxy;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Exceptions;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.Models;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using ReverseProxy.HttpClient;
 using HttpRequest = Microsoft.AspNetCore.Http.HttpRequest;
 using HttpResponse = Microsoft.AspNetCore.Http.HttpResponse;
+using Microsoft.AspNetCore.Http.Extensions;
+using ReverseProxy.Models;
 
-namespace Microsoft.Azure.IoTSolutions.ReverseProxy
+namespace ReverseProxy
 {
     public interface IProxy
     {
         Task<ProxyStatus> PingAsync();
 
-        Task ProcessAsync(
-            string remoteEndpoint,
+        Task ProcessAsync(            
             HttpRequest requestIn,
             HttpResponse responseOut);
     }
 
+
+    // HttpRequest scoped
     public class Proxy : IProxy
     {
         private const string LOCATION_HEADER = "Location";
@@ -55,18 +63,24 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 "x-powered-by",
                 HSTS_HEADER.ToLowerInvariant()
             };
-
+        private readonly FeaturesManager featuresManager;
         private readonly IHttpClient client;
-
         private readonly IConfig config;
+        private readonly ILogger<Proxy> log;
 
-        private readonly ILogger log;
+        private string fromSchemeHostname;
+        private string fromUrl;
+        private string toSchemeHostname;
+        private string toUrl;
+        private string feature;
 
         public Proxy(
+            FeaturesManager featuresManager,
             IHttpClient httpclient,
             IConfig config,
-            ILogger log)
+            ILogger<Proxy> log)
         {
+            this.featuresManager = featuresManager;
             this.client = httpclient;
             this.config = config;
             this.log = log;
@@ -75,7 +89,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         public async Task<ProxyStatus> PingAsync()
         {
             var request = new HttpClient.HttpRequest();
-            request.SetUriFromString(this.config.Endpoint);
+            //request.SetUriFromString(this.config.Endpoint);
             request.Options.EnsureSuccess = false;
             request.Options.Timeout = 5000;
 
@@ -98,8 +112,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             };
         }
 
-        public async Task ProcessAsync(
-            string remoteEndpoint,
+        public async Task ProcessAsync(            
             HttpRequest requestIn,
             HttpResponse responseOut)
         {
@@ -108,7 +121,13 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             try
             {
                 this.RedirectToHttpsIfNeeded(requestIn);
-                request = this.BuildRequest(requestIn, remoteEndpoint);
+                request = this.BuildRequest(requestIn);
+                if (request == null)
+                {
+                    // requested app cannot be found in configuration, return 404:
+                    responseOut.StatusCode = 404;
+                    return;
+                }
             }
             catch (RequestPayloadTooLargeException)
             {
@@ -126,7 +145,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
 
             IHttpResponse response;
             var method = requestIn.Method.ToUpperInvariant();
-            this.log.Debug("Request method", () => new { method });
+            this.log.LogDebug("Request method", method);
             switch (method)
             {
                 case "GET":
@@ -152,13 +171,13 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                     break;
                 default:
                     // Note: this could flood the logs due to spiders...
-                    this.log.Info("Request method not supported", () => new { method });
+                    this.log.LogInformation("Request method not supported", new { method });
                     responseOut.StatusCode = (int) HttpStatusCode.NotImplemented;
                     ApplicationRequestRouting.DisableInstanceAffinity(responseOut);
                     return;
             }
 
-            await this.BuildResponseAsync(response, responseOut, requestIn);
+            await this.BuildResponseAsync(response, responseOut, request, requestIn);
         }
 
         private void RedirectToHttpsIfNeeded(HttpRequest requestIn)
@@ -170,7 +189,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         }
 
         // Prepare the request to send to the remote endpoint
-        private IHttpRequest BuildRequest(HttpRequest requestIn, string toHostname)
+        private IHttpRequest BuildRequest(HttpRequest requestIn)
         {
             var requestOut = new HttpClient.HttpRequest();
 
@@ -179,24 +198,32 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             {
                 if (ExcludedRequestHeaders.Contains(header.Key.ToLowerInvariant()))
                 {
-                    this.log.Debug("Ignoring request header", () => new { header.Key, header.Value });
+                    this.log.LogDebug("Ignoring request header", new { header.Key, header.Value });
                     continue;
                 }
 
-                this.log.Debug("Adding request header", () => new { header.Key, header.Value });
+                this.log.LogDebug("Adding request header", new { header.Key, header.Value });
                 foreach (var value in header.Value)
                 {
                     requestOut.AddHeader(header.Key, value);
                 }
             }
 
-            var url = toHostname + requestIn.Path.Value + requestIn.QueryString;
-            this.log.Debug("URL", () => new { url });
-            requestOut.SetUriFromString(url);
+            FeatureAvailability featureAvailability;
+            (feature, featureAvailability) = featuresManager.GetFeatureFromCookieOrHeader(requestIn);
+            if (featureAvailability == FeatureAvailability.Cookie)
+            {
+                // feature available in cookie, but not as http header. Add to outgoing http headers:
+                requestOut.AddHeader(FeaturesManager.HTTPHEADER_FEATURE, feature);
+            }
+            var urls = featuresManager.GetUrlFromFeatureConfiguration(feature, requestIn);
+            fromSchemeHostname = urls?.fromSchemeHostname;
+            fromUrl = urls?.fromUrl;
+            requestOut.SetUriFromString(urls?.toUrl ?? requestIn.GetEncodedUrl());
 
             // Forward request payload
             var method = requestIn.Method.ToUpperInvariant();
-            if (HttpClient.HttpClient.MethodsWithPayload.Contains(method))
+            if (Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpClient.MethodsWithPayload.Contains(method))
             {
                 requestOut.SetContent(this.GetRequestPayload(requestIn), requestIn.ContentType);
             }
@@ -210,10 +237,14 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             return requestOut;
         }
 
-        private async Task BuildResponseAsync(IHttpResponse response, HttpResponse responseOut, HttpRequest requestIn)
+        
+
+        
+
+        private async Task BuildResponseAsync(IHttpResponse response, HttpResponse responseOut, IHttpRequest request, HttpRequest requestIn)
         {
             // Forward the HTTP status code
-            this.log.Debug("Status code", () => new { response.StatusCode });
+            this.log.LogDebug("Status code", new { response.StatusCode });
             responseOut.StatusCode = (int) response.StatusCode;
 
             // The Headers property can be null in case of errors
@@ -224,13 +255,22 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 {
                     if (ExcludedResponseHeaders.Contains(header.Key.ToLowerInvariant()))
                     {
-                        this.log.Debug("Ignoring response header", () => new { header.Key, header.Value });
+                        this.log.LogDebug("Ignoring response header", new { header.Key, header.Value });
                         continue;
-                    }
+                    }                    
 
-                    this.log.Debug("Adding response header", () => new { header.Key, header.Value });
-                    foreach (var value in header.Value)
+                    this.log.LogDebug("Adding response header", new { header.Key, header.Value });
+                    foreach (var incomingvalue in header.Value)
                     {
+                        var value = incomingvalue;
+                        if (header.Key == "Location")
+                        {
+                            // rewrite redirect url
+                            var fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
+                            var toSchemeHostname = request.Uri.Scheme + "://" + request.Uri.Host;
+                            value = value.Replace(toSchemeHostname, fromSchemeHostname);
+                        }
+
                         if (!responseOut.Headers.ContainsKey(header.Key))
                         {
                             responseOut.Headers[header.Key] = value;
@@ -263,7 +303,34 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             // Some status codes like 204 and 304 can't have a body
             if (response.CanHaveBody && response.Content.Length > 0)
             {
-                await responseOut.Body.WriteAsync(response.Content, 0, response.Content.Length);
+                var rewritepayload = RewritePayload(requestIn, request, response);
+                responseOut.Headers["Content-Length"] = rewritepayload.Length.ToString();
+                await responseOut.Body.WriteAsync(rewritepayload, 0, rewritepayload.Length);
+            }
+        }
+
+        byte[] RewritePayload(HttpRequest requestIn, IHttpRequest request, IHttpResponse response)
+        {
+            var content = response.Content;
+            var contenttypekv = response.Headers?.Where(h => h.Key.ToLower() == "content-type").FirstOrDefault();
+            var contenttype = contenttypekv?.Value.FirstOrDefault();
+            if (contenttype?.Contains(";") == true)
+            {
+                contenttype = contenttype.Substring(0, contenttype.IndexOf(";"));
+            }
+            contenttype = contenttype?.ToLower();
+
+            if (contenttype == "text/html" || contenttype == "text/javascript" || contenttype == "application/json")            
+            {
+                var stringContent = Encoding.UTF8.GetString(content);
+                var fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
+                var toSchemeHostname = request.Uri.Scheme + "://" + request.Uri.Host;
+                var newContent = stringContent.Replace(toSchemeHostname, fromSchemeHostname);
+                return Encoding.UTF8.GetBytes(newContent);
+            }
+            else
+            {
+                return content;
             }
         }
 
