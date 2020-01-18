@@ -1,0 +1,10 @@
+﻿{
+  "default": {
+    "default": "http://backend.local",
+    "webapi": "http://backend-webapi.local/webapi"
+  },
+  "feature1": {
+    "parent": "default",
+    "webapi": "http://backend-webapi.local/webapi2"
+  }
+}
