@@ -14,3 +14,4 @@ wwwroot/
 *.csproj.user
 *.pubxml
 *.pubxml.user
+/ProxyAgent/features.json
