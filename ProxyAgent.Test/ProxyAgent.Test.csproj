@@ -4,6 +4,13 @@
     <LangVersion>7</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="helpers\TargetLogger.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="helpers\TargetLogger.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MartinCostello.Logging.XUnit" Version="0.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.5.0" />
     <PackageReference Include="Moq" Version="4.7.145" />
     <PackageReference Include="System.ValueTuple" Version="4.4.0" />

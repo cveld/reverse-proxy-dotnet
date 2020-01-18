@@ -11,6 +11,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
+using Microsoft.Extensions.Logging;
+using ReverseProxy.HttpClient;
 
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
 {
@@ -33,13 +35,13 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
 
     public class HttpClient : IHttpClient
     {
-        private readonly ILogger log;
+        private readonly ILogger<HttpClient> log;
         private readonly IConfig config;
         private const string CONTENT_TYPE_HEADER = "Content-Type";
 
         public static HashSet<string> MethodsWithPayload => new HashSet<string> { "POST", "PUT", "PATCH" };
 
-        public HttpClient(ILogger logger, IConfig config)
+        public HttpClient(ILogger<HttpClient> logger, IConfig config)
         {
             this.log = logger;
             this.config = config;
@@ -47,7 +49,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
 
         public async Task<IHttpResponse> GetAsync(IHttpRequest request)
         {
-            return await this.SendAsync(request, HttpMethod.Get);
+            var result = await this.SendAsync(request, HttpMethod.Get);
+            return result;
         }
 
         public async Task<IHttpResponse> PostAsync(IHttpRequest request)
@@ -118,7 +121,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
             this.SetContent(request, httpMethod, httpRequest, ref headersOnContentObject);
             this.SetHeaders(request, httpRequest, ref headersOnContentObject);
 
-            this.log.Debug("Sending request", () => new { httpMethod, request.Uri, request.Options });
+            this.log.LogDebug("Sending request", new { httpMethod, request.Uri, request.Options });
 
             try
             {
@@ -153,7 +156,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
                     errorMessage += " - " + e.InnerException.Message;
                 }
 
-                this.log.Error("Request failed", () => new { errorMessage, e });
+                this.log.LogError("Request failed", new { errorMessage, e });
 
                 return new HttpResponse
                 {
@@ -166,8 +169,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
                 // For instance, on some OSes, .NET Core doesn't yet
                 // support ServerCertificateCustomValidationCallback
 
-                this.log.Error("Sorry, your system does not support the requested feature.",
-                    () => new { e });
+                this.log.LogError("Sorry, your system does not support the requested feature.",
+                    new { e });
 
                 return new HttpResponse
                 {
@@ -177,8 +180,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
             }
             catch (TaskCanceledException e)
             {
-                this.log.Error("Request failed",
-                    () => new
+                this.log.LogError("Request failed",
+                    new
                     {
                         Message = e.Message + " The request timed out, the endpoint might be unreachable.",
                         e
@@ -192,7 +195,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
             }
             catch (Exception e)
             {
-                this.log.Error("Request failed", () => new { e.Message, e });
+                this.log.LogError("Request failed", new { e.Message, e });
 
                 return new HttpResponse
                 {
@@ -236,8 +239,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
                 }
                 else
                 {
-                    this.log.Debug("Skipping header already present in the content object",
-                        () => new { header.Key, header.Value });
+                    this.log.LogDebug("Skipping header already present in the content object",
+                        new { header.Key, header.Value });
                 }
             }
         }
@@ -258,9 +261,9 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
                     var configThumbprint = this.config.SslCertThumbprint.ToLowerInvariant();
                     if (sslThumbprint == configThumbprint) return true;
 
-                    this.log.Error("The remote endpoint is using an unknown/invalid SSL certificate, " +
+                    this.log.LogError("The remote endpoint is using an unknown/invalid SSL certificate, " +
                                    "the thumbprint of the certificate doesn't match the value in the configuration",
-                        () => new { sslThumbprint, configThumbprint });
+                        new { sslThumbprint, configThumbprint });
 
                     return false;
                 };

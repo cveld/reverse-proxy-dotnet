@@ -4,22 +4,25 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Models;
+using ReverseProxy.Models;
 
 namespace ProxyAgent.Controllers
 {
-    [Route("selectfeature")]
-    public class SelectFeatureController : Controller
+    [Route("feature")]
+    public class FeatureController : Controller
     {
         private readonly FeaturesManager featuresManager;
 
-        public SelectFeatureController(FeaturesManager featuresManager)
+        public FeatureController(FeaturesManager featuresManager)
         {
             this.featuresManager = featuresManager;
         }        
         public IActionResult Index()
         {            
-            var result = featuresManager.Features.Keys;            
+            var result = featuresManager.Features.Keys;
+            var currentFeature = featuresManager.GetFeatureFromCookieOrHeader(Request);
             ViewBag.Features = result.Select(c => c);
+            ViewBag.CurrentFeature = currentFeature;
             return View();
         }
 
@@ -31,6 +34,14 @@ namespace ProxyAgent.Controllers
                 return Ok();
             } 
             return NotFound();
+        }
+
+        [HttpGet("current")]
+        public IActionResult CurrentFeature()
+        {
+            var currentFeature = featuresManager.GetFeatureFromCookieOrHeader(Request);
+            ViewBag.CurrentFeature = currentFeature;
+            return View();
         }
     }
 }

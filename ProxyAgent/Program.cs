@@ -2,6 +2,7 @@
 
 using System.IO;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy
 {
@@ -16,8 +17,12 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 })
                 //.UseLibuv(options => options.ThreadCount = System.Environment.ProcessorCount)
                 .UseContentRoot(Directory.GetCurrentDirectory())
-                .UseIISIntegration()
-                .UseStartup<Startup>()
+                .UseIISIntegration()  
+                .ConfigureLogging((builder) =>
+                {
+                    builder.SetMinimumLevel(LogLevel.Trace);
+                })
+                .UseStartup<Startup>()                
                 .Build();
 
             host.Run();

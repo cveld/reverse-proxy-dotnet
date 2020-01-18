@@ -10,7 +10,7 @@ using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ILogger = Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics.ILogger;
+using ReverseProxy.Models;
 
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy
 {
@@ -41,7 +41,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             this.ApplicationContainer = DependencyResolution.Setup(services);
 
             // Print some useful information at bootstrap time
-            PrintBootstrapInfo(this.ApplicationContainer);
+            // PrintBootstrapInfo(this.ApplicationContainer);
 
             // Create the IServiceProvider based on the container
             return new AutofacServiceProvider(this.ApplicationContainer);
@@ -55,7 +55,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             IApplicationLifetime appLifetime,
             FeaturesManager featuresManager)
         {
-            loggerFactory.AddConsole(this.Configuration.GetSection("Logging"));
+            loggerFactory.AddConsole(this.Configuration.GetSection("Logging"));           
             
             featuresManager.ReadConfig($"{env.ContentRootPath}\\features.json");
 
@@ -77,9 +77,9 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         {
             var logger = container.Resolve<ILogger>();
             var config = container.Resolve<IConfig>();
-            logger.Info("Proxy agent started", () => new { Uptime.ProcessId });
+            logger.LogInformation("Proxy agent started {ProcessId}", Uptime.ProcessId);
             //logger.Info("Remote endpoint: " + config.Endpoint, () => { });
-            logger.Info("Max payload size: " + config.MaxPayloadSize, () => { });
+            logger.LogInformation("Max payload size: " + config.MaxPayloadSize);
         }
     }
 }

@@ -4,15 +4,17 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
 using Newtonsoft.Json;
+using HttpHeaders = Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpHeaders;
 
-namespace Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient
+namespace ReverseProxy.HttpClient
 {
     public interface IHttpRequest
     {
         Uri Uri { get; set; }
 
-        HttpHeaders Headers { get; }        
+        Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpHeaders Headers { get; }        
 
         MediaTypeHeaderValue ContentType { get; }
 

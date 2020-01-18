@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Exceptions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 // TODO: tests
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
@@ -22,9 +23,9 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
     public class ConfigData : IConfigData
     {
         private readonly IConfigurationRoot configuration;
-        private readonly ILogger log;
+        private readonly ILogger<ConfigData> log;
 
-        public ConfigData(ILogger logger)
+        public ConfigData(ILogger<ConfigData> logger)
         {
             this.log = logger;
 
@@ -41,7 +42,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
             var value = this.configuration.GetValue(key, defaultValue);
             this.ReplaceEnvironmentVariables(ref value, defaultValue);
 
-            this.log.Info("Configuration setting", () => new { key, value });
+            this.log.LogInformation("Configuration setting", new { key, value });
 
             return value;
         }
@@ -109,7 +110,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
             if (keys.Length > 0)
             {
                 var varsNotFound = keys.Aggregate(", ", (current, k) => current + k);
-                this.log.Error("Environment variables not found", () => new { varsNotFound });
+                this.log.LogError("Environment variables not found: {varsNotFound}", varsNotFound);
                 throw new InvalidConfigurationException("Environment variables not found: " + varsNotFound);
             }
         }
@@ -143,7 +144,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime
                 value = keys.Aggregate(value, (current, k) => current.Replace("${?" + k + "}", string.Empty));
 
                 var varsNotFound = keys.Aggregate(", ", (current, k) => current + k);
-                this.log.Warn("Environment variables not found", () => new { varsNotFound });
+                this.log.LogWarning("Environment variables not found {varsNotFound}", varsNotFound);
 
                 notFound = true;
             }

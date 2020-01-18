@@ -1,21 +1,27 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Azure.IoTSolutions.ReverseProxy;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Diagnostics;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Exceptions;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Models;
 using Microsoft.Azure.IoTSolutions.ReverseProxy.Runtime;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using ReverseProxy.HttpClient;
 using HttpRequest = Microsoft.AspNetCore.Http.HttpRequest;
 using HttpResponse = Microsoft.AspNetCore.Http.HttpResponse;
+using Microsoft.AspNetCore.Http.Extensions;
+using ReverseProxy.Models;
 
-namespace Microsoft.Azure.IoTSolutions.ReverseProxy
+namespace ReverseProxy
 {
     public interface IProxy
     {
@@ -26,6 +32,8 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             HttpResponse responseOut);
     }
 
+
+    // HttpRequest scoped
     public class Proxy : IProxy
     {
         private const string LOCATION_HEADER = "Location";
@@ -58,7 +66,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
         private readonly FeaturesManager featuresManager;
         private readonly IHttpClient client;
         private readonly IConfig config;
-        private readonly ILogger log;
+        private readonly ILogger<Proxy> log;
 
         private string fromSchemeHostname;
         private string fromUrl;
@@ -70,7 +78,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             FeaturesManager featuresManager,
             IHttpClient httpclient,
             IConfig config,
-            ILogger log)
+            ILogger<Proxy> log)
         {
             this.featuresManager = featuresManager;
             this.client = httpclient;
@@ -137,7 +145,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
 
             IHttpResponse response;
             var method = requestIn.Method.ToUpperInvariant();
-            this.log.Debug("Request method", () => new { method });
+            this.log.LogDebug("Request method", method);
             switch (method)
             {
                 case "GET":
@@ -163,7 +171,7 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                     break;
                 default:
                     // Note: this could flood the logs due to spiders...
-                    this.log.Info("Request method not supported", () => new { method });
+                    this.log.LogInformation("Request method not supported", new { method });
                     responseOut.StatusCode = (int) HttpStatusCode.NotImplemented;
                     ApplicationRequestRouting.DisableInstanceAffinity(responseOut);
                     return;
@@ -190,63 +198,32 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             {
                 if (ExcludedRequestHeaders.Contains(header.Key.ToLowerInvariant()))
                 {
-                    this.log.Debug("Ignoring request header", () => new { header.Key, header.Value });
+                    this.log.LogDebug("Ignoring request header", new { header.Key, header.Value });
                     continue;
                 }
 
-                this.log.Debug("Adding request header", () => new { header.Key, header.Value });
+                this.log.LogDebug("Adding request header", new { header.Key, header.Value });
                 foreach (var value in header.Value)
                 {
                     requestOut.AddHeader(header.Key, value);
                 }
-            }                      
-
-            // Check http header for feature configuration:
-            var result = requestIn.Headers.TryGetValue(FeaturesManager.HTTPHEADER_FEATURE, out StringValues stringValues);            
-
-            if (result)
-            {
-                feature = stringValues[0];
             }
-            else
+
+            FeatureAvailability featureAvailability;
+            (feature, featureAvailability) = featuresManager.GetFeatureFromCookieOrHeader(requestIn);
+            if (featureAvailability == FeatureAvailability.Cookie)
             {
-                // if http header not present, check cookie:
-                if (!requestIn.Cookies.TryGetValue(FeaturesManager.COOKIE_FEATURE, out feature))
-                {
-                    // Neither cookie nor httpheader are set. Set default feature:
-                    feature = FeaturesManager.DEFAULTFEATURE;
-                }
-                // feature configuration not yet available in http header. Add it:
+                // feature available in cookie, but not as http header. Add to outgoing http headers:
                 requestOut.AddHeader(FeaturesManager.HTTPHEADER_FEATURE, feature);
             }
-                                       
-            var activefeature = featuresManager.Features[feature];
-            
-            var segments = requestIn.Path.Value.Split('/');
-            string url;
-            if (!activefeature.ContainsKey(segments[1]))
-            {
-                // requested app not found in feature configuration, forward request to the default:
-                toUrl = activefeature[FeaturesManager.DEFAULTURLKEY];
-                url = toUrl + "/" + requestIn.Path.Value + requestIn.QueryString;
-                fromUrl = requestIn.Scheme + "://" + requestIn.Host;
-                fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
-            }
-            else
-            {
-                toUrl = activefeature[segments[1]];
-                var path = string.Join("/", segments.Skip(2));
-                url = toUrl + "/" + path + requestIn.QueryString;
-                fromUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + segments[1];
-                fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
-            }
-
-            this.log.Debug("URL", () => new { url });
-            requestOut.SetUriFromString(url);
+            var urls = featuresManager.GetUrlFromFeatureConfiguration(feature, requestIn);
+            fromSchemeHostname = urls?.fromSchemeHostname;
+            fromUrl = urls?.fromUrl;
+            requestOut.SetUriFromString(urls?.toUrl ?? requestIn.GetEncodedUrl());
 
             // Forward request payload
             var method = requestIn.Method.ToUpperInvariant();
-            if (HttpClient.HttpClient.MethodsWithPayload.Contains(method))
+            if (Microsoft.Azure.IoTSolutions.ReverseProxy.HttpClient.HttpClient.MethodsWithPayload.Contains(method))
             {
                 requestOut.SetContent(this.GetRequestPayload(requestIn), requestIn.ContentType);
             }
@@ -260,10 +237,14 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
             return requestOut;
         }
 
+        
+
+        
+
         private async Task BuildResponseAsync(IHttpResponse response, HttpResponse responseOut, IHttpRequest request, HttpRequest requestIn)
         {
             // Forward the HTTP status code
-            this.log.Debug("Status code", () => new { response.StatusCode });
+            this.log.LogDebug("Status code", new { response.StatusCode });
             responseOut.StatusCode = (int) response.StatusCode;
 
             // The Headers property can be null in case of errors
@@ -274,11 +255,11 @@ namespace Microsoft.Azure.IoTSolutions.ReverseProxy
                 {
                     if (ExcludedResponseHeaders.Contains(header.Key.ToLowerInvariant()))
                     {
-                        this.log.Debug("Ignoring response header", () => new { header.Key, header.Value });
+                        this.log.LogDebug("Ignoring response header", new { header.Key, header.Value });
                         continue;
                     }                    
 
-                    this.log.Debug("Adding response header", () => new { header.Key, header.Value });
+                    this.log.LogDebug("Adding response header", new { header.Key, header.Value });
                     foreach (var incomingvalue in header.Value)
                     {
                         var value = incomingvalue;
