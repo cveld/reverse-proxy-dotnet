@@ -29,8 +29,8 @@ namespace ProxyAgent.Controllers
         [HttpGet("{feature}")]
         public IActionResult Index(string feature)
         {
-            if (featuresManager.FeaturesOld.ContainsKey(feature)) {
-                Response.Cookies.Append("feature", feature);
+            if (featuresManager.featuresRoot.DefaultHost.Features.ContainsKey(feature)) {
+                Response.Cookies.Append(FeaturesManager.COOKIE_FEATURE, feature);
                 return Ok();
             } 
             return NotFound();
