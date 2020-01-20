@@ -1,0 +1,21 @@
+﻿{
+  "default-feature": {
+    "default-url": "http://backend.local",
+    "webapi": "http://backend-webapi.local/webapi",
+    "apps/myapp": "applications/myapplication"   
+  },
+  "feature1": {
+    "parent": "default-feature",
+    "webapi": "http://backend-webapi.local/webapi2"
+  },
+  "hostname:otherhostname.local": {
+    "default-feature": {
+      "default-url": "http://otherbackend.local"
+    }
+  },
+  "hostname:otherhostname2.local": {
+    "default-feature": {
+      "default-url": "http://otherbackend.local"
+    }
+  }
+}

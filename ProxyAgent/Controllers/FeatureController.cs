@@ -19,7 +19,7 @@ namespace ProxyAgent.Controllers
         }        
         public IActionResult Index()
         {            
-            var result = featuresManager.Features.Keys;
+            var result = featuresManager.FeaturesOld.Keys;
             var currentFeature = featuresManager.GetFeatureFromCookieOrHeader(Request);
             ViewBag.Features = result.Select(c => c);
             ViewBag.CurrentFeature = currentFeature;
@@ -29,7 +29,7 @@ namespace ProxyAgent.Controllers
         [HttpGet("{feature}")]
         public IActionResult Index(string feature)
         {
-            if (featuresManager.Features.ContainsKey(feature)) {
+            if (featuresManager.FeaturesOld.ContainsKey(feature)) {
                 Response.Cookies.Append("feature", feature);
                 return Ok();
             } 

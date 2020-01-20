@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 
 namespace Microsoft.Azure.IoTSolutions.ReverseProxy.Models.Config
 {
-    public class Features
+    public class FeatureUrls
     {
+        string DefaultUrl { get; set; }
+        Dictionary<string, string> Urls { get; set; }
     }
 }
