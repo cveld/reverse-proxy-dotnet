@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.IoTSolutions.ReverseProxy.Models.Config;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReverseProxy.Models;
@@ -92,13 +93,35 @@ namespace ProxyAgent.Test.Models
             // Arrange
             var httpContext = new DefaultHttpContext();
             var randomurl = "http://" + Guid.NewGuid();
-            target.FeaturesOld = new Dictionary<string, Dictionary<string, string>>
+
+            target.featuresRoot = new Microsoft.Azure.IoTSolutions.ReverseProxy.Models.Config.FeaturesRoot
             {
-                { FeaturesManager.DEFAULTFEATURE, new Dictionary<string, string>
+                DefaultHost = new Microsoft.Azure.IoTSolutions.ReverseProxy.Models.Config.FeaturesConfig
+                {
+                    Features = new Dictionary<string, Feature>
                     {
-                        { FeaturesManager.DEFAULTURLKEY, randomurl }
+                        {
+                            FeaturesManager.DEFAULTFEATURE, new Feature
+                            {
+                                Name = FeaturesManager.DEFAULTFEATURE,
+                                Urls = new StringNode
+                                {
+                                    Children = new Dictionary<string, StringNode>
+                                    {
+                                        {
+                                            FeaturesManager.DEFAULTURLKEY, new StringNode
+                                            {
+                                                Children = new Dictionary<string, StringNode>(),
+                                                Value = randomurl
+                                            }
+                                        }
+                                    }                                    
+                                }
+                            }
+                        }
                     }
-                }
+                },
+                Hostnames = new Dictionary<string, FeaturesConfig>()
             };
             httpContext.Request.Scheme = "http";
             httpContext.Request.Host = HostString.FromUriComponent(Guid.NewGuid().ToString());

@@ -288,6 +288,53 @@ namespace ReverseProxy.Models
             return (feature, featureAvailability);
         }
 
+        private FeaturesConfig GetFeaturesConfigFromFeatureConfigurationByUrl(string hostname)
+        {
+            var result = featuresRoot.Hostnames.TryGetValue(hostname, out FeaturesConfig featuresConfig);
+            if (!result)
+            {
+                return featuresRoot.DefaultHost;
+            }
+            return featuresConfig;            
+        }
+
+        /// <summary>
+        /// Searches the Url-tree in feature configuration for a path. Returns null if not found; iterates all parents
+        /// </summary>
+        /// <param name="feature"></param>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private (string targeturl, int level)? FindTargetUrl(Feature feature, string[] segments)
+        {            
+            var currentFeature = feature;
+            var currentNode = currentFeature.Urls;
+            var segmentindex = 0;            
+
+            while (segmentindex < segments.Length)
+            {
+                var result = currentNode.Children.TryGetValue(segments[segmentindex], out StringNode child);
+                if (!result)
+                {
+                    if (feature.Parent != null)
+                    {
+                        // not found in current feature. Iterate the parent
+                        currentNode = currentFeature.Urls;
+                        currentFeature = currentFeature.Parent;
+                        segmentindex = 0;
+                        continue;
+                    }
+                    else
+                    {
+                        // not found, and no parents left
+                        return null;
+                    }
+                }
+                currentNode = child;
+                segmentindex++;
+            }
+            return (currentNode.Value, segmentindex);
+        }
+
         /// <summary>
         /// Derives the target url from feature configuration and given HttpRequest
         /// </summary>
@@ -301,31 +348,34 @@ namespace ReverseProxy.Models
             string toFeatureUrl;
             string toUrl;
 
-            if (FeaturesOld == null)
+            if (featuresRoot == null)
             {
                 return null;
             }
-            var success = FeaturesOld.TryGetValue(feature ?? FeaturesManager.DEFAULTFEATURE, out var activefeature);
+            var featuresConfig = GetFeaturesConfigFromFeatureConfigurationByUrl(requestIn.Host.ToString());
+
+            var success = featuresConfig.Features.TryGetValue(feature ?? FeaturesManager.DEFAULTFEATURE, out var activefeature);
             if (!success)
             {
                 logger.LogError($"Feature not present: {feature ?? FeaturesManager.DEFAULTFEATURE}", feature);
                 return null;
             }
-
-            var segments = requestIn.Path.Value.Split('/');
             
-            if (segments.Length <= 1 || !activefeature.ContainsKey(segments[1]))
+            var segments = requestIn.Path.Value.Split('/');
+            var targeturl = FindTargetUrl(activefeature, segments);
+            
+            if (targeturl == null)
             {
                 // requested app not found in feature configuration, forward request to the default:
-                toFeatureUrl = activefeature[FeaturesManager.DEFAULTURLKEY];
+                toFeatureUrl = activefeature.Urls.Children[FeaturesManager.DEFAULTURLKEY].Value;
                 toUrl = toFeatureUrl + (!requestIn.Path.HasValue || string.IsNullOrEmpty(requestIn.Path.Value) ? String.Empty : ("/" + requestIn.Path.Value)) + requestIn.QueryString;
                 fromUrl = requestIn.Scheme + "://" + requestIn.Host;
                 fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
             }
             else
             {
-                toFeatureUrl = activefeature[segments[1]];
-                var path = string.Join("/", segments.Skip(2));
+                toFeatureUrl = targeturl.Value.targeturl;
+                var path = string.Join("/", segments.Skip(targeturl.Value.level + 1));
                 toUrl = toFeatureUrl + "/" + path + requestIn.QueryString;
                 fromUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + segments[1];
                 fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
