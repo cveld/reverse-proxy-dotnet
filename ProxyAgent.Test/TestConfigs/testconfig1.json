@@ -2,7 +2,7 @@
   "default-feature": {
     "default-url": "http://backend.local",
     "webapi": "http://backend-webapi.local/webapi",
-    "apps/myapp": "applications/myapplication"   
+    "apps/myapp": "applications/myapplication"
   },
   "feature1": {
     "parent": "default-feature",

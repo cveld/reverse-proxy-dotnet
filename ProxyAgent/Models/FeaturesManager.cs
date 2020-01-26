@@ -313,8 +313,25 @@ namespace ReverseProxy.Models
             while (segmentindex < segments.Length)
             {
                 var result = currentNode.Children.TryGetValue(segments[segmentindex], out StringNode child);
+                if (result)
+                {
+                    // we found a matching branch; go to the child
+                    currentNode = child;
+                    segmentindex++;
+                    if (currentNode.Value != null)
+                    {
+                        // we have found a leaf; return this result
+                        return (currentNode.Value, segmentindex);
+                    }
+                    if (segmentindex >= segments.Length)
+                    {
+                        // all segments looped; enforce traversing towards the parent:
+                        result = false;
+                    }
+                }
                 if (!result)
                 {
+                    // the branch did not match; traverse parent
                     if (feature.Parent != null)
                     {
                         // not found in current feature. Iterate the parent
@@ -329,8 +346,12 @@ namespace ReverseProxy.Models
                         return null;
                     }
                 }
-                currentNode = child;
-                segmentindex++;
+                
+            }
+            if (currentNode.Value == null)
+            {
+                // not at leaf, but still at a branch. This is not a valid result
+                return null;
             }
             return (currentNode.Value, segmentindex);
         }
@@ -360,24 +381,29 @@ namespace ReverseProxy.Models
                 logger.LogError($"Feature not present: {feature ?? FeaturesManager.DEFAULTFEATURE}", feature);
                 return null;
             }
-            
-            var segments = requestIn.Path.Value.Split('/');
+
+            var pathwithoutstartingslash = requestIn.Path.Value.StartsWith('/') ? requestIn.Path.Value.Substring(1) : requestIn.Path.Value;
+            var segments = pathwithoutstartingslash.Split('/');
             var targeturl = FindTargetUrl(activefeature, segments);
             
             if (targeturl == null)
             {
                 // requested app not found in feature configuration, forward request to the default:
                 toFeatureUrl = activefeature.Urls.Children[FeaturesManager.DEFAULTURLKEY].Value;
-                toUrl = toFeatureUrl + (!requestIn.Path.HasValue || string.IsNullOrEmpty(requestIn.Path.Value) ? String.Empty : ("/" + requestIn.Path.Value)) + requestIn.QueryString;
+                toUrl = toFeatureUrl + (!requestIn.Path.HasValue || string.IsNullOrEmpty(requestIn.Path.Value) ? String.Empty : ("/" + pathwithoutstartingslash)) + requestIn.QueryString;
                 fromUrl = requestIn.Scheme + "://" + requestIn.Host;
                 fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
             }
             else
             {
                 toFeatureUrl = targeturl.Value.targeturl;
-                var path = string.Join("/", segments.Skip(targeturl.Value.level + 1));
-                toUrl = toFeatureUrl + "/" + path + requestIn.QueryString;
-                fromUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + segments[1];
+                toUrl = toFeatureUrl;
+                if (!toUrl.Contains("://")) {
+                    toUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + toUrl;
+                }
+                var path = string.Join("/", segments.Skip(targeturl.Value.level));
+                toUrl += (string.IsNullOrEmpty(path) ? String.Empty : "/" + path) + requestIn.QueryString;
+                fromUrl = requestIn.Scheme + "://" + requestIn.Host + "/" + string.Join("/", segments.Take(targeturl.Value.level));
                 fromSchemeHostname = requestIn.Scheme + "://" + requestIn.Host;
             }
 

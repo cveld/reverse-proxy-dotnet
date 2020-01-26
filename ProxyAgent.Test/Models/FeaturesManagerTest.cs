@@ -164,7 +164,26 @@ namespace ProxyAgent.Test.Models
             var hostname = target.featuresRoot.Hostnames["otherhostname.local"];
             var feature = hostname.Features[FeaturesManager.DEFAULTFEATURE];
             Assert.Equal("http://otherbackend.local", feature.Urls.Children[FeaturesManager.DEFAULTURLKEY].Value);
+        }
 
+        [Fact]
+        public void GetUrlFromFeatureConfiguration_DeepPath_GetsExpectedResult()
+        {
+            // Arrange
+            target.ReadConfig(Directory.GetCurrentDirectory() + "/TestConfigs/testconfig1.json");
+            var httpContext = new DefaultHttpContext();
+            httpContext.Request.Scheme = "http";
+            var randomhost = Guid.NewGuid().ToString();
+            httpContext.Request.Host = HostString.FromUriComponent(randomhost);
+            httpContext.Request.Path = "/apps/myapp/deeppath";
+
+            // Act
+            var segments = httpContext.Request.Path.Value.Split('/');
+            var result = target.GetUrlFromFeatureConfiguration(null, httpContext.Request);
+
+            // Assert
+            Assert.Equal($"applications/myapplication", result.Value.toFeatureUrl);
+            Assert.Equal($"http://{randomhost}/applications/myapplication/deeppath", result.Value.toUrl);
         }
     }
 }
